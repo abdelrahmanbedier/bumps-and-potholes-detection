@@ -29,10 +29,16 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.HashMap;
 import java.util.Set;
 import java.util.UUID;
 
@@ -41,6 +47,7 @@ import java.util.UUID;
  */
 
 public class MapActivity extends AppCompatActivity implements OnMapReadyCallback {
+    DatabaseReference rootRef,demoRef;
 void detect_bump(){
 
     if (mLocationPermissionsGranted) {
@@ -78,7 +85,8 @@ void detect_bump(){
     private static final String COURSE_LOCATION = Manifest.permission.ACCESS_COARSE_LOCATION;
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1234;
     private static final float DEFAULT_ZOOM = 15f;
-
+    public double longitude;
+    public double latitude;
     //vars
     private Boolean mLocationPermissionsGranted = false;
     private GoogleMap mMap;
@@ -103,7 +111,8 @@ void detect_bump(){
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_map);
-
+        rootRef = FirebaseDatabase.getInstance().getReference();
+        demoRef = rootRef.child("Coordinates");
         getLocationPermission();
     }
 
@@ -129,6 +138,69 @@ void detect_bump(){
                             Log.d(TAG, "moveCamera: moving the camera to: lat: " + latLng.latitude + ", lng: " + latLng.longitude );
                             mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, DEFAULT_ZOOM));
                             mMap.addMarker(options);
+                              longitude = latLng.longitude;
+                              latitude = latLng.latitude;
+
+                            rootRef.child("Coordinates").orderByChild("x").startAt(29).endAt(32).addListenerForSingleValueEvent(new ValueEventListener() {
+                                @Override
+                                public void onDataChange(DataSnapshot dataSnapshot) {
+                                    if (dataSnapshot.exists()) {
+                                        // dataSnapshot is the "issue" node with all children with id 0
+                                        for (DataSnapshot issue : dataSnapshot.getChildren()) {
+                                            //String name = (String) issue.child("y").getValue();
+                                            double ydouble = issue.child("y").getValue(Double.class);
+                                            double xdouble = issue.child("x").getValue(Double.class);
+
+                                            if(ydouble > 29 && ydouble < 32) {
+                                                // HashMap<String, Object> result = new HashMap<>();
+                                                //result.put("y", "345");
+                                                //DatabaseReference yref = issue.child("y").getRef();
+                                                //ydouble = ydouble * 2;
+                                                //yref.setValue(ydouble);
+
+                                                //DatabaseReference xref = issue.child("x").getRef();
+                                                //xdouble = xdouble + 10;
+                                                //xref.setValue(xdouble);
+
+                                                //rootRef.child("Coordinates").child("y").removeValue();
+                                                //String key = (String)issue.getKey();
+                                                //issue.getChildren(key)
+
+
+
+
+                                                // usersRef = ref.child("Users").child(name);
+                                                return;
+                                            }
+
+
+                                        }
+
+
+                                    }
+
+
+                                    double coorx =longitude ;
+                                    double coory =latitude ;
+                                    HashMap<String, Double> coordinates = new HashMap<String, Double>();
+
+                                    coordinates.put("x", coorx);
+                                    coordinates.put("y", coory);
+                                    coordinates.put("z",1.0);
+
+
+                                    // usersRef = ref.child("Users").child(name);
+                                    demoRef.push().setValue(coordinates);
+
+                                    }
+
+
+
+                                @Override
+                                public void onCancelled(DatabaseError databaseError) {
+
+                                }
+                            });
 
                         }else{
                             Log.d(TAG, "onComplete: current location is null");

@@ -1,0 +1,99 @@
+{
+  "project_info": {
+    "project_number": "350972178923",
+    "firebase_url": "https://graduation-project-8c8f5.firebaseio.com",
+    "project_id": "graduation-project-8c8f5",
+    "storage_bucket": "graduation-project-8c8f5.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:350972178923:android:fac25c2661a3233a",
+        "android_client_info": {
+          "package_name": "com.example.bedier.googlemapsbumps"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "350972178923-g4hpmf0qr63r29knaes71q4sb9ak72p7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.bedier.googlemapsbumps",
+            "certificate_hash": "fe1aec276decc560170dc52b4d11c179926d0c10"
+          }
+        },
+        {
+          "client_id": "350972178923-l820br9jmretbq64375glm3qjti0ps8o.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAgIMDOrHpaCJyA0381AvPi4ADpsWU9Qvo"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 2,
+          "other_platform_oauth_client": [
+            {
+              "client_id": "350972178923-l820br9jmretbq64375glm3qjti0ps8o.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:350972178923:android:5747443e733b9ded",
+        "android_client_info": {
+          "package_name": "com.example.tinky.myapplication"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "350972178923-ck00l8l9uuf91dft8rtm0j54c2rc1ve0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.tinky.myapplication",
+            "certificate_hash": "c4c41799a6d6da9bfaa48e928b94f4a6d4bf09f1"
+          }
+        },
+        {
+          "client_id": "350972178923-l820br9jmretbq64375glm3qjti0ps8o.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAgIMDOrHpaCJyA0381AvPi4ADpsWU9Qvo"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 2,
+          "other_platform_oauth_client": [
+            {
+              "client_id": "350972178923-l820br9jmretbq64375glm3qjti0ps8o.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
