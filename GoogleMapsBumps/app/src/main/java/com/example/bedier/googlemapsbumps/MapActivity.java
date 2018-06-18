@@ -1,14 +1,15 @@
 package com.example.bedier.googlemapsbumps;
-import android.*;
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.NonNull;
@@ -20,7 +21,6 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.view.inputmethod.EditorInfo;
 import android.widget.AutoCompleteTextView;
-import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -35,9 +35,11 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.LocationSource;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.database.DataSnapshot;
@@ -46,9 +48,16 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -222,13 +231,20 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
             Log.d(TAG, "geoLocate: found a location: " + address.toString());
             //Toast.makeText(this, address.toString(), Toast.LENGTH_SHORT).show();
-            LatLng latLng = new LatLng(address.getLatitude(),address.getLongitude());
+            LatLng currentLatLng = new LatLng(latitude,longitude);
+            LatLng addressLatLng = new LatLng(address.getLatitude(),address.getLongitude());
+            float distance[] = new float[20];
+            Location.distanceBetween(latitude,longitude,address.getLatitude(),address.getLongitude(),distance);
             MarkerOptions options = new MarkerOptions()
-                    .position(latLng)
+                    .position(addressLatLng)
                     .title(address.getAddressLine(0));
-            Log.d(TAG, "moveCamera: moving the camera to: lat: " + latLng.latitude + ", lng: " + latLng.longitude );
-            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, DEFAULT_ZOOM));
+            Log.d(TAG, "moveCamera: moving the camera to: lat: " + addressLatLng.latitude + ", lng: " + addressLatLng.longitude );
+            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(addressLatLng, DEFAULT_ZOOM));
+            options.snippet("Distance : "+Math.round(distance[0])+"m");
             mMap.addMarker(options);
+            String url = getRequestUrl(currentLatLng,addressLatLng);
+            TaskRequestDirections taskRequestDirections = new TaskRequestDirections();
+            taskRequestDirections.execute(url);
         }
     }
     private void getDeviceLocation(){
@@ -247,16 +263,13 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                             Log.d(TAG, "onComplete: found location!");
                             Location currentLocation = (Location) task.getResult();
                             LatLng latLng = new LatLng(currentLocation.getLatitude(),currentLocation.getLongitude());
-                            MarkerOptions options = new MarkerOptions()
-                                    .position(latLng)
-                                    .title("Bump!");
-                            Log.d(TAG, "moveCamera: moving the camera to: lat: " + latLng.latitude + ", lng: " + latLng.longitude );
-                            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, DEFAULT_ZOOM));
-                            mMap.addMarker(options);
+
+                            //Log.d(TAG, "moveCamera: moving the camera to: lat: " + latLng.latitude + ", lng: " + latLng.longitude );
+                            //mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, DEFAULT_ZOOM));
                             longitude = latLng.longitude;
                             latitude = latLng.latitude;
 
-                            rootRef.child("Coordinates").orderByChild("x").startAt(29).endAt(32).addListenerForSingleValueEvent(new ValueEventListener() {
+                            rootRef.child("Coordinates").orderByChild("x").startAt(latitude-0.0005).endAt(latitude+0.0005).addListenerForSingleValueEvent(new ValueEventListener() {
                                 @Override
                                 public void onDataChange(DataSnapshot dataSnapshot) {
                                     if (dataSnapshot.exists()) {
@@ -265,29 +278,22 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                                             //String name = (String) issue.child("y").getValue();
                                             double ydouble = issue.child("y").getValue(Double.class);
                                             double xdouble = issue.child("x").getValue(Double.class);
-
-                                            //if(ydouble > 29 && ydouble < 32) {
-                                                // HashMap<String, Object> result = new HashMap<>();
-                                                //result.put("y", "345");
-                                                //DatabaseReference yref = issue.child("y").getRef();
-                                                //ydouble = ydouble * 2;
-                                                //yref.setValue(ydouble);
-
-                                                //DatabaseReference xref = issue.child("x").getRef();
-                                                //xdouble = xdouble + 10;
-                                                //xref.setValue(xdouble);
-
-                                                //rootRef.child("Coordinates").child("y").removeValue();
-                                                //String key = (String)issue.getKey();
-                                                //issue.getChildren(key)
+                                            double zdouble = issue.child("z").getValue(Double.class);
 
 
+                                            if(ydouble > longitude-0.0005 && ydouble < longitude+0.0005) {
+                                            xdouble = ((zdouble * xdouble) + latitude) / (zdouble + 1);
+                                            ydouble = ((zdouble * ydouble) + longitude) / (zdouble + 1);
+                                            zdouble += 1;
 
-
-                                                // usersRef = ref.child("Users").child(name);
-                                              //  return;
-                                            //}
-
+                                            DatabaseReference xref = issue.child("x").getRef();
+                                            xref.setValue(xdouble);
+                                            DatabaseReference yref = issue.child("y").getRef();
+                                            yref.setValue(ydouble);
+                                            DatabaseReference zref = issue.child("z").getRef();
+                                            zref.setValue(zdouble);
+                                            return;
+                                        }
 
                                         }
 
@@ -305,6 +311,13 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
                                     // usersRef = ref.child("Users").child(name);
                                     demoRef.push().setValue(coordinates);
+                                    LatLng latLng = new LatLng(latitude,longitude);
+                                    MarkerOptions options = new MarkerOptions()
+                                            .position(latLng)
+                                            .title("Bump!");
+
+                                    options.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE));
+                                    mMap.addMarker(options);
 
                                 }
 
@@ -351,7 +364,8 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
                             Log.d(TAG, "moveCamera: moving the camera to: lat: " + latLng.latitude + ", lng: " + latLng.longitude );
                             mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, DEFAULT_ZOOM));
-
+                            longitude = latLng.longitude;
+                            latitude = latLng.latitude;
                             rootRef.child("Coordinates").orderByChild("x").addListenerForSingleValueEvent(new ValueEventListener() {
                                 @Override
                                 public void onDataChange(DataSnapshot dataSnapshot) {
@@ -361,11 +375,11 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                                             //String name = (String) issue.child("y").getValue();
                                             double ydouble = issue.child("y").getValue(Double.class);
                                             double xdouble = issue.child("x").getValue(Double.class);
-
                                             LatLng bumpsLatLng = new LatLng(xdouble, ydouble);
                                             MarkerOptions options = new MarkerOptions()
                                                     .position(bumpsLatLng)
                                                     .title("Bump!");
+                                            options.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE));
                                             mMap.addMarker(options);
 
                                         }
@@ -564,9 +578,138 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
         workerThread.start();
     }
+    private String getRequestUrl(LatLng origin, LatLng dest) {
+        //Value of origin
+        String str_org = "origin=" + origin.latitude +","+origin.longitude;
+        //Value of destination
+        String str_dest = "destination=" + dest.latitude+","+dest.longitude;
+        //Set value enable the sensor
+        String sensor = "sensor=false";
+        //Mode for find direction
+        String mode = "mode=driving";
+        //Build the full param
+        String param = str_org +"&" + str_dest + "&" +sensor+"&" +mode;
+        //Output format
+        String output = "json";
+        //Create url to request
+        String url = "https://maps.googleapis.com/maps/api/directions/" + output + "?" + param;
+        return url;
+    }
 
+    private String requestDirection(String reqUrl) throws IOException {
+        String responseString = "";
+        InputStream inputStream = null;
+        HttpURLConnection httpURLConnection = null;
+        try{
+            URL url = new URL(reqUrl);
+            httpURLConnection = (HttpURLConnection) url.openConnection();
+            httpURLConnection.connect();
 
+            //Get the response result
+            inputStream = httpURLConnection.getInputStream();
+            InputStreamReader inputStreamReader = new InputStreamReader(inputStream);
+            BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
+
+            StringBuffer stringBuffer = new StringBuffer();
+            String line = "";
+            while ((line = bufferedReader.readLine()) != null) {
+                stringBuffer.append(line);
+            }
+
+            responseString = stringBuffer.toString();
+            bufferedReader.close();
+            inputStreamReader.close();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (inputStream != null) {
+                inputStream.close();
+            }
+            httpURLConnection.disconnect();
+        }
+        return responseString;
+    }
+    public class TaskRequestDirections extends AsyncTask<String, Void, String> {
+
+        @Override
+        protected String doInBackground(String... strings) {
+            String responseString = "";
+            try {
+                responseString = requestDirection(strings[0]);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            return  responseString;
+        }
+
+        @Override
+        protected void onPostExecute(String s) {
+            super.onPostExecute(s);
+            //Parse json here
+            TaskParser taskParser = new TaskParser();
+            taskParser.execute(s);
+        }
+    }
+
+    public class TaskParser extends AsyncTask<String, Void, List<List<HashMap<String, String>>> > {
+
+        @Override
+        protected List<List<HashMap<String, String>>> doInBackground(String... strings) {
+            JSONObject jsonObject = null;
+            List<List<HashMap<String, String>>> routes = null;
+            try {
+                jsonObject = new JSONObject(strings[0]);
+                DataParser dataParser = new DataParser();
+                routes = dataParser.parse(jsonObject);
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+            return routes;
+        }
+
+        @Override
+        protected void onPostExecute(List<List<HashMap<String, String>>> lists) {
+            //Get list route and display it into the map
+
+            ArrayList points = null;
+
+            PolylineOptions polylineOptions = null;
+
+            for (List<HashMap<String, String>> path : lists) {
+                points = new ArrayList();
+                polylineOptions = new PolylineOptions();
+
+                for (HashMap<String, String> point : path) {
+                    double lat = Double.parseDouble(point.get("lat"));
+                    double lon = Double.parseDouble(point.get("lon"));
+
+                    points.add(new LatLng(lat,lon));
+                }
+
+                polylineOptions.addAll(points);
+                polylineOptions.width(15);
+                polylineOptions.color(Color.BLUE);
+                polylineOptions.geodesic(true);
+            }
+
+            if (polylineOptions!=null) {
+                mMap.addPolyline(polylineOptions);
+            } else {
+                Toast.makeText(getApplicationContext(), "Direction not found!", Toast.LENGTH_SHORT).show();
+            }
+
+        }
+    }
 }
+
+
+
+
+
+
+
+
 
 
 
