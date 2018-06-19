@@ -19,8 +19,11 @@ import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.AutoCompleteTextView;
+import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -38,6 +41,7 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
@@ -87,6 +91,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
 
     //vars
+
     private Boolean mLocationPermissionsGranted = false;
     private GoogleMap mMap;
     private FusedLocationProviderClient mFusedLocationProviderClient;
@@ -94,6 +99,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     private LocationSource.OnLocationChangedListener mListener;
     private GoogleApiClient mGoogleApiClient;
     private PlaceAutocompleteAdapter mPlaceAutocompleteAdapter;
+    private Marker mm;
     //bluetooth var
 
 
@@ -130,6 +136,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             mMap.setMyLocationEnabled(true);
             mMap.getUiSettings().setMyLocationButtonEnabled(false);
             init();
+
         }
 
 
@@ -150,9 +157,31 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_map);
         mSearchText =(AutoCompleteTextView) findViewById(R.id.input_search);
+        final ImageView bumpButton = (ImageView) findViewById(R.id.bumpButton);
+        final ImageView bumpButtonUsed = (ImageView) findViewById(R.id.bumpButtonUsed);
+
         rootRef = FirebaseDatabase.getInstance().getReference();
         demoRef = rootRef.child("Coordinates");
         getLocationPermission();
+
+        bumpButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                bumpButton.setVisibility(View.INVISIBLE);
+                bumpButtonUsed.setVisibility(View.VISIBLE);
+
+                mMap.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener() {
+                    @Override
+                    public void onMapLongClick(LatLng latLng) {
+                        add2FirebaseManually(latLng);
+                        Toast.makeText(MapActivity.this,"Bump added !", Toast.LENGTH_SHORT).show();
+                        mMap.setOnMapLongClickListener(null);
+                        bumpButton.setVisibility(View.VISIBLE);
+                        bumpButtonUsed.setVisibility(View.INVISIBLE);
+                    }
+                });
+            }
+        });
     }
     @Override
     public void onLocationChanged(Location location) {
@@ -171,7 +200,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     void detect_bump(){
 
         //if (mLocationPermissionsGranted) {
-        getDeviceLocation();
+        add2Firebase();
         //  if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
         //        != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this,
         //      Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -227,6 +256,8 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         }
 
         if(list.size() > 0){
+            if(mm!=null)
+                mm.remove();
             Address address = list.get(0);
 
             Log.d(TAG, "geoLocate: found a location: " + address.toString());
@@ -235,19 +266,20 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             LatLng addressLatLng = new LatLng(address.getLatitude(),address.getLongitude());
             float distance[] = new float[20];
             Location.distanceBetween(latitude,longitude,address.getLatitude(),address.getLongitude(),distance);
-            MarkerOptions options = new MarkerOptions()
+             MarkerOptions options = new MarkerOptions()
                     .position(addressLatLng)
                     .title(address.getAddressLine(0));
             Log.d(TAG, "moveCamera: moving the camera to: lat: " + addressLatLng.latitude + ", lng: " + addressLatLng.longitude );
             mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(addressLatLng, DEFAULT_ZOOM));
             options.snippet("Distance : "+Math.round(distance[0])+"m");
-            mMap.addMarker(options);
+            mm=mMap.addMarker(options);
             String url = getRequestUrl(currentLatLng,addressLatLng);
             TaskRequestDirections taskRequestDirections = new TaskRequestDirections();
             taskRequestDirections.execute(url);
+
         }
     }
-    private void getDeviceLocation(){
+    private void add2Firebase(){
         Log.d(TAG, "getDeviceLocation: getting the devices current location");
 
         mFusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
@@ -266,8 +298,10 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
                             //Log.d(TAG, "moveCamera: moving the camera to: lat: " + latLng.latitude + ", lng: " + latLng.longitude );
                             //mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, DEFAULT_ZOOM));
-                            longitude = latLng.longitude;
-                            latitude = latLng.latitude;
+
+                                longitude = latLng.longitude;
+                                latitude = latLng.latitude;
+
 
                             rootRef.child("Coordinates").orderByChild("x").startAt(latitude-0.0005).endAt(latitude+0.0005).addListenerForSingleValueEvent(new ValueEventListener() {
                                 @Override
@@ -316,7 +350,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                                             .position(latLng)
                                             .title("Bump!");
 
-                                    options.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE));
+                                    options.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE));
                                     mMap.addMarker(options);
 
                                 }
@@ -339,6 +373,76 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         }catch (SecurityException e){
             Log.e(TAG, "getDeviceLocation: SecurityException: " + e.getMessage() );
         }
+    }
+    private void add2FirebaseManually(LatLng latLng){
+        longitude = latLng.longitude;
+        latitude = latLng.latitude;
+        rootRef.child("Coordinates").orderByChild("x").startAt(latitude-0.0005).endAt(latitude+0.0005).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                if (dataSnapshot.exists()) {
+                    // dataSnapshot is the "issue" node with all children with id 0
+                    for (DataSnapshot issue : dataSnapshot.getChildren()) {
+                        //String name = (String) issue.child("y").getValue();
+                        double ydouble = issue.child("y").getValue(Double.class);
+                        double xdouble = issue.child("x").getValue(Double.class);
+                        double zdouble = issue.child("z").getValue(Double.class);
+
+
+                        if(ydouble > longitude-0.0005 && ydouble < longitude+0.0005) {
+                            xdouble = ((zdouble * xdouble) + latitude) / (zdouble + 1);
+                            ydouble = ((zdouble * ydouble) + longitude) / (zdouble + 1);
+                            zdouble += 1;
+
+                            DatabaseReference xref = issue.child("x").getRef();
+                            xref.setValue(xdouble);
+                            DatabaseReference yref = issue.child("y").getRef();
+                            yref.setValue(ydouble);
+                            DatabaseReference zref = issue.child("z").getRef();
+                            zref.setValue(zdouble);
+                            return;
+                        }
+
+                    }
+
+
+                }
+
+                double coorx =latitude ;
+                double coory =longitude ;
+                HashMap<String, Double> coordinates = new HashMap<String, Double>();
+
+                coordinates.put("x", coorx);
+                coordinates.put("y", coory);
+                coordinates.put("z",1.0);
+
+
+                // usersRef = ref.child("Users").child(name);
+                demoRef.push().setValue(coordinates);
+                LatLng latLng = new LatLng(latitude,longitude);
+                MarkerOptions options = new MarkerOptions()
+                        .position(latLng)
+                        .title("Bump!");
+
+                options.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE));
+                mMap.addMarker(options);
+
+            }
+
+
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+
+
+
+
+
+
+
     }
 
 ///////////////////////////////////
@@ -379,7 +483,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                                             MarkerOptions options = new MarkerOptions()
                                                     .position(bumpsLatLng)
                                                     .title("Bump!");
-                                            options.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE));
+                                            options.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE));
                                             mMap.addMarker(options);
 
                                         }
