@@ -1,7 +1,11 @@
 package com.example.bedier.googlemapsbumps;
 
 import android.app.Dialog;
+import android.content.Context;
 import android.content.Intent;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -12,7 +16,7 @@ import android.widget.Toast;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements LocationListener {
     private static final String TAG = "MainActivity";
     private static final int ERROR_DIALOG_REQUEST = 9001;
 
@@ -23,6 +27,8 @@ public class MainActivity extends AppCompatActivity {
         if (isServicesOK()){
             init();
         }
+      //  LocationManager lm = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
+     //   lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, this);
     }
 
     private void init(){
@@ -34,6 +40,7 @@ public class MainActivity extends AppCompatActivity {
              startActivity(intent);
          }
      });
+     
     }
 
     public boolean isServicesOK() {
@@ -61,12 +68,23 @@ public class MainActivity extends AppCompatActivity {
 }
 
 
+    @Override
+    public void onLocationChanged(Location location) {
 
+    }
 
+    @Override
+    public void onStatusChanged(String s, int i, Bundle bundle) {
 
+    }
 
+    @Override
+    public void onProviderEnabled(String s) {
 
+    }
 
+    @Override
+    public void onProviderDisabled(String s) {
 
-
+    }
 }

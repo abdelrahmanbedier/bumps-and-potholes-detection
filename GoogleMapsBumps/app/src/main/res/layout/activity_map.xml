@@ -58,4 +58,12 @@
         android:layout_marginLeft="10dp"
         app:srcCompat="@drawable/bumpused" />
 
+    <TextView
+        android:id="@+id/textview"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignEnd="@+id/relLayout1"
+        android:layout_alignTop="@+id/bumpButton"
+        android:text="TextView" />
+
 </RelativeLayout>

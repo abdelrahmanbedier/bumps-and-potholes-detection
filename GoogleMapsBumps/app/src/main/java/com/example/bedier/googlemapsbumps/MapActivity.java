@@ -9,6 +9,7 @@ import android.graphics.Color;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
+import android.location.LocationManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
@@ -63,6 +64,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
@@ -72,7 +74,7 @@ import java.util.UUID;
  * Created by User on 10/2/2017.
  */
 
-public class MapActivity extends AppCompatActivity implements OnMapReadyCallback,GoogleApiClient.OnConnectionFailedListener,LocationListener {
+public class MapActivity extends AppCompatActivity implements OnMapReadyCallback,GoogleApiClient.OnConnectionFailedListener {
 
 
     private static final String TAG = "MapActivity";
@@ -85,6 +87,8 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
     public double longitude;
     public double latitude;
+    public double mlongitude;
+    public double mlatitude;
 
     //widgets
     private AutoCompleteTextView mSearchText;
@@ -113,7 +117,10 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     int readBufferPosition;
     int counter;
     volatile boolean stopWorker;
-    static final int REQUEST_LOCATION = 1;
+    LocationManager locationManager;
+    private static final int REQUEST_LOCATION_PERMISSION = 1;
+    android.location.LocationListener locationListener;
+    TextView txt;
 
     DatabaseReference rootRef,demoRef;
 
@@ -156,6 +163,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_map);
+
         mSearchText =(AutoCompleteTextView) findViewById(R.id.input_search);
         final ImageView bumpButton = (ImageView) findViewById(R.id.bumpButton);
         final ImageView bumpButtonUsed = (ImageView) findViewById(R.id.bumpButtonUsed);
@@ -182,19 +190,11 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                 });
             }
         });
-    }
-    @Override
-    public void onLocationChanged(Location location) {
-            /* Push location updates to the registered listener..
-             * (this ensures that my-location layer will set the blue dot at the new/received location) */
-        if (mListener != null) {
-            mListener.onLocationChanged(location);
-        }
+        updateLocation();
 
-            /* ..and Animate camera to center on that location !
-             * (the reason for we created this custom Location Source !) */
-        mMap.animateCamera(CameraUpdateFactory.newLatLng(new LatLng(location.getLatitude(), location.getLongitude())));
     }
+
+
 
 
     void detect_bump(){
@@ -262,7 +262,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
             Log.d(TAG, "geoLocate: found a location: " + address.toString());
             //Toast.makeText(this, address.toString(), Toast.LENGTH_SHORT).show();
-            LatLng currentLatLng = new LatLng(latitude,longitude);
+            LatLng currentLatLng = new LatLng(mlatitude,mlongitude);
             LatLng addressLatLng = new LatLng(address.getLatitude(),address.getLongitude());
             float distance[] = new float[20];
             Location.distanceBetween(latitude,longitude,address.getLatitude(),address.getLongitude(),distance);
@@ -299,13 +299,14 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                             //Log.d(TAG, "moveCamera: moving the camera to: lat: " + latLng.latitude + ", lng: " + latLng.longitude );
                             //mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, DEFAULT_ZOOM));
 
-                                longitude = latLng.longitude;
-                                latitude = latLng.latitude;
+                            longitude = latLng.longitude;
+                            latitude = latLng.latitude;
 
 
                             rootRef.child("Coordinates").orderByChild("x").startAt(latitude-0.0005).endAt(latitude+0.0005).addListenerForSingleValueEvent(new ValueEventListener() {
                                 @Override
                                 public void onDataChange(DataSnapshot dataSnapshot) {
+                                    double currentTime = System.currentTimeMillis();
                                     if (dataSnapshot.exists()) {
                                         // dataSnapshot is the "issue" node with all children with id 0
                                         for (DataSnapshot issue : dataSnapshot.getChildren()) {
@@ -326,6 +327,8 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                                             yref.setValue(ydouble);
                                             DatabaseReference zref = issue.child("z").getRef();
                                             zref.setValue(zdouble);
+                                            DatabaseReference tref = issue.child("time").getRef();
+                                            tref.setValue(currentTime);
                                             return;
                                         }
 
@@ -341,6 +344,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                                     coordinates.put("x", coorx);
                                     coordinates.put("y", coory);
                                     coordinates.put("z",1.0);
+                                    coordinates.put("time",currentTime);
 
 
                                     // usersRef = ref.child("Users").child(name);
@@ -380,6 +384,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         rootRef.child("Coordinates").orderByChild("x").startAt(latitude-0.0005).endAt(latitude+0.0005).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
+                double currentTime = System.currentTimeMillis();
                 if (dataSnapshot.exists()) {
                     // dataSnapshot is the "issue" node with all children with id 0
                     for (DataSnapshot issue : dataSnapshot.getChildren()) {
@@ -400,6 +405,9 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                             yref.setValue(ydouble);
                             DatabaseReference zref = issue.child("z").getRef();
                             zref.setValue(zdouble);
+                            DatabaseReference tref = issue.child("time").getRef();
+                            tref.setValue(currentTime);
+
                             return;
                         }
 
@@ -415,6 +423,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                 coordinates.put("x", coorx);
                 coordinates.put("y", coory);
                 coordinates.put("z",1.0);
+                coordinates.put("time",currentTime);
 
 
                 // usersRef = ref.child("Users").child(name);
@@ -444,11 +453,48 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
 
     }
+    private void updateLocation(){
+        txt = (TextView) this.findViewById(R.id.textview);
+        locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+        if (ActivityCompat.checkSelfPermission(this,
+                Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]
+                            {Manifest.permission.ACCESS_FINE_LOCATION},
+                    REQUEST_LOCATION_PERMISSION);
+        }
+        locationListener = new android.location.LocationListener() {
+            @Override
+            public void onLocationChanged(Location location) {
+                mMap.animateCamera(CameraUpdateFactory.newLatLng(new LatLng(location.getLatitude(), location.getLongitude())));                float nCurrentSpeed = location.getSpeed();
+                txt.setText((nCurrentSpeed*18)/5 + " km/h");
+                mlatitude=location.getLatitude();
+                mlongitude=location.getLongitude();
+                notifyUser();
 
-///////////////////////////////////
+
+            }
 
 
+            @Override
+            public void onStatusChanged(String provider, int status, Bundle extras) {
 
+            }
+
+            @Override
+            public void onProviderEnabled(String provider) {
+
+            }
+
+            @Override
+            public void onProviderDisabled(String provider) {
+
+            }
+        };
+        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, locationListener);
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
+
+    }
     private void getCurrentLocation(){
         Log.d(TAG, "getDeviceLocation: getting the devices current location");
 
@@ -473,10 +519,13 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                             rootRef.child("Coordinates").orderByChild("x").addListenerForSingleValueEvent(new ValueEventListener() {
                                 @Override
                                 public void onDataChange(DataSnapshot dataSnapshot) {
+                                    double currentTime = System.currentTimeMillis();
                                     if (dataSnapshot.exists()) {
                                         // dataSnapshot is the "issue" node with all children with id 0
                                         for (DataSnapshot issue : dataSnapshot.getChildren()) {
-                                            //String name = (String) issue.child("y").getValue();
+                                            double time = issue.child("time").getValue(Double.class);
+                                            double difference = bumpTimeOut(time,currentTime);
+                                            if(difference<7){
                                             double ydouble = issue.child("y").getValue(Double.class);
                                             double xdouble = issue.child("x").getValue(Double.class);
                                             LatLng bumpsLatLng = new LatLng(xdouble, ydouble);
@@ -486,6 +535,10 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                                             options.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE));
                                             mMap.addMarker(options);
 
+                                        }
+                                        else{
+///////////////////
+                                            }
                                         }
                                     }
                                 }
@@ -507,6 +560,42 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             Log.e(TAG, "getDeviceLocation: SecurityException: " + e.getMessage() );
         }
     }
+    private void notifyUser(){
+        rootRef.child("Coordinates").orderByChild("x").startAt(mlatitude-0.0005).endAt(mlatitude+0.0005).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                double currentTime = System.currentTimeMillis();
+                if (dataSnapshot.exists()) {
+                    // dataSnapshot is the "issue" node with all children with id 0
+                    for (DataSnapshot issue : dataSnapshot.getChildren()) {
+                        //String name = (String) issue.child("y").getValue();
+                        double ydouble = issue.child("y").getValue(Double.class);
+                        if(ydouble > mlongitude-0.0005 && ydouble < mlongitude+0.0005) {
+                            Toast.makeText(getApplicationContext(), "5od balak!", Toast.LENGTH_SHORT).show();
+
+                        }
+
+                    }
+
+
+                }
+
+
+
+            }
+
+
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+
+
+            }
+
+
 
 
 
@@ -681,6 +770,30 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         });
 
         workerThread.start();
+    }
+
+    public double bumpTimeOut(double startDate, double endDate) {
+        //milliseconds
+        double different = endDate- startDate;
+
+
+        double secondsInMilli = 1000;
+        double minutesInMilli = secondsInMilli * 60;
+        double hoursInMilli = minutesInMilli * 60;
+        double daysInMilli = hoursInMilli * 24;
+
+        double elapsedDays = different / daysInMilli;
+        different = different % daysInMilli;
+
+        double elapsedHours = different / hoursInMilli;
+        different = different % hoursInMilli;
+
+        double elapsedMinutes = different / minutesInMilli;
+        different = different % minutesInMilli;
+
+        double elapsedSeconds = different / secondsInMilli;
+
+        return elapsedDays;
     }
     private String getRequestUrl(LatLng origin, LatLng dest) {
         //Value of origin
