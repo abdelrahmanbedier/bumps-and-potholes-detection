@@ -11,14 +11,27 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.Toast;
+
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.ValueEventListener;
 
-public class MainActivity extends AppCompatActivity implements LocationListener {
+import java.util.HashMap;
+
+public class MainActivity extends AppCompatActivity{
     private static final String TAG = "MainActivity";
     private static final int ERROR_DIALOG_REQUEST = 9001;
+    Button login,signUp;
+    EditText username, password;
+    DatabaseReference rootRef,demoRef;
+    String user,pass;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -27,16 +40,29 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
         if (isServicesOK()){
             init();
         }
-      //  LocationManager lm = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
-     //   lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, this);
+
+        rootRef = FirebaseDatabase.getInstance().getReference();
+
     }
 
     private void init(){
-     Button BtnMap = (Button) findViewById(R.id.btnMap);
-     BtnMap.setOnClickListener(new View.OnClickListener() {
+        login=(Button)findViewById(R.id.btnlogin);
+        signUp=(Button)findViewById(R.id.btnSignUp);
+        username=(EditText)findViewById(R.id.txtuser);
+        password=(EditText)findViewById(R.id.txtpass);
+     login.setOnClickListener(new View.OnClickListener() {
          @Override
          public void onClick(View view) {
-             Intent intent = new Intent(MainActivity.this,MapActivity.class);
+             user=username.getText().toString().trim();
+             pass=password.getText().toString().trim();
+             login();
+         }
+     });
+
+     signUp.setOnClickListener(new View.OnClickListener() {
+         @Override
+         public void onClick(View view) {
+             Intent intent = new Intent(MainActivity.this, SignUp.class);
              startActivity(intent);
          }
      });
@@ -68,23 +94,50 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
 }
 
 
-    @Override
-    public void onLocationChanged(Location location) {
+    private void login() {
 
+
+        rootRef.child("Users").orderByChild("username").addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                if (dataSnapshot.exists()) {
+                    for (DataSnapshot issue : dataSnapshot.getChildren()) {
+                        String username = issue.child("username").getValue(String.class);
+                        String password = issue.child("password").getValue(String.class);
+                        String uOrV = issue.child("Volunteer_User").getValue(String.class);
+                        if(user.equals(username) && pass.equals(password)){
+                            if(uOrV.equals("v")) {
+                                Intent intent = new Intent(MainActivity.this, MapActivity.class);
+                                startActivity(intent);
+                                return;
+                            }
+                            else if(uOrV.equals("u")) {
+                                Intent intent = new Intent(MainActivity.this, MapActivity2.class);
+                                startActivity(intent);
+                                return;
+
+                            }
+                        }
+
+                        }
+                    Toast.makeText(MainActivity.this,"Wrong Username or Password", Toast.LENGTH_SHORT).show();
+
+
+
+                    }
+                }
+
+
+
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+
+
+        });
+
+
+        }
     }
-
-    @Override
-    public void onStatusChanged(String s, int i, Bundle bundle) {
-
-    }
-
-    @Override
-    public void onProviderEnabled(String s) {
-
-    }
-
-    @Override
-    public void onProviderDisabled(String s) {
-
-    }
-}

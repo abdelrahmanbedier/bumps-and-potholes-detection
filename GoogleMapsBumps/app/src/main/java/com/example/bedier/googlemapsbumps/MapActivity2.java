@@ -80,7 +80,7 @@ import java.util.UUID;
  * Created by User on 10/2/2017.
  */
 
-public class MapActivity extends AppCompatActivity implements OnMapReadyCallback,GoogleApiClient.OnConnectionFailedListener {
+public class MapActivity2 extends AppCompatActivity implements OnMapReadyCallback,GoogleApiClient.OnConnectionFailedListener {
 
 
     private static final String TAG = "MapActivity";
@@ -153,13 +153,6 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         }
 
 
-        try {
-            findBT();
-            openBT();
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
 
     }
 
@@ -168,18 +161,18 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_map);
+        setContentView(R.layout.activity_map2);
+
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-
         mSearchText =(AutoCompleteTextView) findViewById(R.id.input_search);
-        final ImageView bumpButton = (ImageView) findViewById(R.id.bumpButton);
-        final ImageView bumpButtonUsed = (ImageView) findViewById(R.id.bumpButtonUsed);
+
         final ImageView currentLocationBtn = (ImageView) findViewById(R.id.getLocationButton);
 
         rootRef = FirebaseDatabase.getInstance().getReference();
         demoRef = rootRef.child("Coordinates");
         getLocationPermission();
+
         currentLocationBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -187,24 +180,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(currentLocBtn, DEFAULT_ZOOM));
             }
         });
-        bumpButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                bumpButton.setVisibility(View.INVISIBLE);
-                bumpButtonUsed.setVisibility(View.VISIBLE);
 
-                mMap.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener() {
-                    @Override
-                    public void onMapLongClick(LatLng latLng) {
-                        add2FirebaseManually(latLng);
-                        Toast.makeText(MapActivity.this,"Bump added !", Toast.LENGTH_SHORT).show();
-                        mMap.setOnMapLongClickListener(null);
-                        bumpButton.setVisibility(View.VISIBLE);
-                        bumpButtonUsed.setVisibility(View.INVISIBLE);
-                    }
-                });
-            }
-        });
         updateSpeed();
 
     }
@@ -234,7 +210,6 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         }
 
     }
-
 
     void detect_bump(){
 
@@ -286,7 +261,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
         String searchString = mSearchText.getText().toString();
 
-        Geocoder geocoder = new Geocoder(MapActivity.this);
+        Geocoder geocoder = new Geocoder(MapActivity2.this);
         List<Address> list = new ArrayList<>();
         try{
             list = geocoder.getFromLocationName(searchString, 1);
@@ -305,7 +280,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             LatLng addressLatLng = new LatLng(address.getLatitude(),address.getLongitude());
             float distance[] = new float[20];
             Location.distanceBetween(latitude,longitude,address.getLatitude(),address.getLongitude(),distance);
-             MarkerOptions options = new MarkerOptions()
+            MarkerOptions options = new MarkerOptions()
                     .position(addressLatLng)
                     .title(address.getAddressLine(0));
             Log.d(TAG, "moveCamera: moving the camera to: lat: " + addressLatLng.latitude + ", lng: " + addressLatLng.longitude );
@@ -356,20 +331,20 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
 
                                             if(ydouble > longitude-0.0005 && ydouble < longitude+0.0005) {
-                                            xdouble = ((zdouble * xdouble) + latitude) / (zdouble + 1);
-                                            ydouble = ((zdouble * ydouble) + longitude) / (zdouble + 1);
-                                            zdouble += 1;
+                                                xdouble = ((zdouble * xdouble) + latitude) / (zdouble + 1);
+                                                ydouble = ((zdouble * ydouble) + longitude) / (zdouble + 1);
+                                                zdouble += 1;
 
-                                            DatabaseReference xref = issue.child("x").getRef();
-                                            xref.setValue(xdouble);
-                                            DatabaseReference yref = issue.child("y").getRef();
-                                            yref.setValue(ydouble);
-                                            DatabaseReference zref = issue.child("z").getRef();
-                                            zref.setValue(zdouble);
-                                            DatabaseReference tref = issue.child("time").getRef();
-                                            tref.setValue(currentTime);
-                                            return;
-                                        }
+                                                DatabaseReference xref = issue.child("x").getRef();
+                                                xref.setValue(xdouble);
+                                                DatabaseReference yref = issue.child("y").getRef();
+                                                yref.setValue(ydouble);
+                                                DatabaseReference zref = issue.child("z").getRef();
+                                                zref.setValue(zdouble);
+                                                DatabaseReference tref = issue.child("time").getRef();
+                                                tref.setValue(currentTime);
+                                                return;
+                                            }
 
                                         }
 
@@ -408,7 +383,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
                         }else{
                             Log.d(TAG, "onComplete: current location is null");
-                            Toast.makeText(MapActivity.this, "unable to get current location", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(MapActivity2.this, "unable to get current location", Toast.LENGTH_SHORT).show();
                         }
                     }
                 });
@@ -416,81 +391,6 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         }catch (SecurityException e){
             Log.e(TAG, "getDeviceLocation: SecurityException: " + e.getMessage() );
         }
-    }
-    private void add2FirebaseManually(LatLng latLng){
-        longitude = latLng.longitude;
-        latitude = latLng.latitude;
-        rootRef.child("Coordinates").orderByChild("x").startAt(latitude-0.0005).endAt(latitude+0.0005).addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
-                double currentTime = System.currentTimeMillis();
-                if (dataSnapshot.exists()) {
-                    // dataSnapshot is the "issue" node with all children with id 0
-                    for (DataSnapshot issue : dataSnapshot.getChildren()) {
-                        //String name = (String) issue.child("y").getValue();
-                        double ydouble = issue.child("y").getValue(Double.class);
-                        double xdouble = issue.child("x").getValue(Double.class);
-                        double zdouble = issue.child("z").getValue(Double.class);
-
-
-                        if(ydouble > longitude-0.0005 && ydouble < longitude+0.0005) {
-                            xdouble = ((zdouble * xdouble) + latitude) / (zdouble + 1);
-                            ydouble = ((zdouble * ydouble) + longitude) / (zdouble + 1);
-                            zdouble += 1;
-
-                            DatabaseReference xref = issue.child("x").getRef();
-                            xref.setValue(xdouble);
-                            DatabaseReference yref = issue.child("y").getRef();
-                            yref.setValue(ydouble);
-                            DatabaseReference zref = issue.child("z").getRef();
-                            zref.setValue(zdouble);
-                            DatabaseReference tref = issue.child("time").getRef();
-                            tref.setValue(currentTime);
-
-                            return;
-                        }
-
-                    }
-
-
-                }
-
-                double coorx =latitude ;
-                double coory =longitude ;
-                HashMap<String, Double> coordinates = new HashMap<String, Double>();
-
-                coordinates.put("x", coorx);
-                coordinates.put("y", coory);
-                coordinates.put("z",1.0);
-                coordinates.put("time",currentTime);
-
-
-                // usersRef = ref.child("Users").child(name);
-                demoRef.push().setValue(coordinates);
-                LatLng latLng = new LatLng(latitude,longitude);
-                MarkerOptions options = new MarkerOptions()
-                        .position(latLng)
-                        .title("Bump!");
-
-                options.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE));
-                mMap.addMarker(options);
-
-            }
-
-
-
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-
-            }
-        });
-
-
-
-
-
-
-
     }
     private void updateSpeed(){
         txt = (TextView) this.findViewById(R.id.textview);
@@ -565,17 +465,17 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                                             double time = issue.child("time").getValue(Double.class);
                                             double difference = bumpTimeOut(time,currentTime);
                                             if(difference<7){
-                                            double ydouble = issue.child("y").getValue(Double.class);
-                                            double xdouble = issue.child("x").getValue(Double.class);
-                                            LatLng bumpsLatLng = new LatLng(xdouble, ydouble);
-                                            MarkerOptions options = new MarkerOptions()
-                                                    .position(bumpsLatLng)
-                                                    .title("Bump!");
-                                            options.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE));
-                                            mMap.addMarker(options);
+                                                double ydouble = issue.child("y").getValue(Double.class);
+                                                double xdouble = issue.child("x").getValue(Double.class);
+                                                LatLng bumpsLatLng = new LatLng(xdouble, ydouble);
+                                                MarkerOptions options = new MarkerOptions()
+                                                        .position(bumpsLatLng)
+                                                        .title("Bump!");
+                                                options.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE));
+                                                mMap.addMarker(options);
 
-                                        }
-                                        else{
+                                            }
+                                            else{
 ///////////////////
                                             }
                                         }
@@ -590,7 +490,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
                         }else{
                             Log.d(TAG, "onComplete: current location is null");
-                            Toast.makeText(MapActivity.this, "unable to get current location", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(MapActivity2.this, "unable to get current location", Toast.LENGTH_SHORT).show();
                         }
                     }
                 });
@@ -632,7 +532,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         });
 
 
-            }
+    }
 
 
 
@@ -657,7 +557,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         Log.d(TAG, "initMap: initializing map");
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
 
-        mapFragment.getMapAsync(MapActivity.this);
+        mapFragment.getMapAsync(MapActivity2.this);
     }
 
     private void getLocationPermission(){
@@ -707,109 +607,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         }
     }
 
-    void findBT() {
-        mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-        if (mBluetoothAdapter == null) {
-        }
 
-        if (!mBluetoothAdapter.isEnabled()) {
-            Intent enableBluetooth = new Intent(
-                    BluetoothAdapter.ACTION_REQUEST_ENABLE);
-            startActivityForResult(enableBluetooth, 0);
-        }
-
-        Set<BluetoothDevice> pairedDevices = mBluetoothAdapter
-                .getBondedDevices();
-        if (pairedDevices.size() > 0) {
-            for (BluetoothDevice device : pairedDevices) {
-                if (device.getName().equals("HC-05")) // this name have to be
-                // replaced with your
-                // bluetooth device name
-                {
-                    mmDevice = device;
-                    Log.v("ArduinoBT",
-                            "findBT found device named " + mmDevice.getName());
-                    Log.v("ArduinoBT",
-                            "device address is " + mmDevice.getAddress());
-                    break;
-                }
-            }
-        }
-    }
-
-    void openBT() throws IOException {
-
-        UUID uuid = UUID.fromString("00001101-0000-1000-8000-00805f9b34fb"); // Standard
-        // SerialPortService
-        // ID
-
-        mmSocket = mmDevice.createRfcommSocketToServiceRecord(uuid);
-        Log.d(TAG, "ya raaaaaaaab");
-
-        mmSocket.connect();
-        Log.d(TAG, "eshta3'al?");
-
-        mmOutputStream = mmSocket.getOutputStream();
-        mmInputStream = mmSocket.getInputStream();
-        Log.d(TAG, "haa");
-
-        beginListenForData();
-
-    }
-
-    void beginListenForData() {
-        final Handler handler = new Handler();
-        final byte delimiter = 10; // This is the ASCII code for a newline
-        // character
-
-        stopWorker = false;
-        readBufferPosition = 0;
-        readBuffer = new byte[1024];
-        workerThread = new Thread(new Runnable() {
-            public void run() {
-                Log.d(TAG, "ha b2aa");
-
-                while (!Thread.currentThread().isInterrupted() && !stopWorker) {
-                    try {
-                        int bytesAvailable = mmInputStream.available();
-                        //Log.d(TAG, "fe bytes?"+bytesAvailable);
-
-                        if (bytesAvailable > 0) {
-                            byte[] packetBytes = new byte[bytesAvailable];
-                            mmInputStream.read(packetBytes);
-                            for (int i = 0; i < bytesAvailable; i++) {
-                                byte b = packetBytes[i];
-                                if (b == delimiter) {
-                                    byte[] encodedBytes = new byte[readBufferPosition];
-                                    System.arraycopy(readBuffer, 0,
-                                            encodedBytes, 0,
-                                            encodedBytes.length);
-                                    final String data = new String(
-                                            encodedBytes, "US-ASCII");
-                                    readBufferPosition = 0;
-
-                                    handler.post(new Runnable() {
-                                        public void run() {
-
-                                            detect_bump();
-
-                                        }
-                                    });
-                                } else {
-                                    readBuffer[readBufferPosition++] = b;
-                                }
-                            }
-
-                        }
-                    } catch (IOException ex) {
-                        stopWorker = true;
-                    }
-                }
-            }
-        });
-
-        workerThread.start();
-    }
 
     public double bumpTimeOut(double startDate, double endDate) {
         //milliseconds
