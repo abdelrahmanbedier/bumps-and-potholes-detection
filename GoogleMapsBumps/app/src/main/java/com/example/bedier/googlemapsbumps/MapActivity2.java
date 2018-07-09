@@ -10,6 +10,7 @@ import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationManager;
+import android.media.MediaPlayer;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
@@ -95,6 +96,10 @@ public class MapActivity2 extends AppCompatActivity implements OnMapReadyCallbac
     public double latitude;
     public double mlongitude;
     public double mlatitude;
+    public int speedInKm;
+    public int vel1;
+    public int vel2;
+    MediaPlayer buzzer;
 
     //widgets
     private AutoCompleteTextView mSearchText;
@@ -121,7 +126,9 @@ public class MapActivity2 extends AppCompatActivity implements OnMapReadyCallbac
     Thread workerThread;
     byte[] readBuffer;
     int readBufferPosition;
-    int counter;
+    int notifyFlag=1;
+    int velocityFlag=1;
+    int counter=1;
     volatile boolean stopWorker;
     LocationManager locationManager;
     private static final int REQUEST_LOCATION_PERMISSION = 1;
@@ -168,6 +175,7 @@ public class MapActivity2 extends AppCompatActivity implements OnMapReadyCallbac
         mSearchText =(AutoCompleteTextView) findViewById(R.id.input_search);
 
         final ImageView currentLocationBtn = (ImageView) findViewById(R.id.getLocationButton);
+        final MediaPlayer buzzer = MediaPlayer.create(this,R.raw.buzzer);
 
         rootRef = FirebaseDatabase.getInstance().getReference();
         demoRef = rootRef.child("Coordinates");
@@ -211,20 +219,6 @@ public class MapActivity2 extends AppCompatActivity implements OnMapReadyCallbac
 
     }
 
-    void detect_bump(){
-
-        //if (mLocationPermissionsGranted) {
-        add2Firebase();
-        //  if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-        //        != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this,
-        //      Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-        // return;
-        //}
-        //mMap.setMyLocationEnabled(true);
-        //mMap.getUiSettings().setMyLocationButtonEnabled(false);
-
-//    }
-    }
     private void init(){
         Log.d(TAG, "init: initializing");
 
@@ -293,105 +287,6 @@ public class MapActivity2 extends AppCompatActivity implements OnMapReadyCallbac
 
         }
     }
-    private void add2Firebase(){
-        Log.d(TAG, "getDeviceLocation: getting the devices current location");
-
-        mFusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
-
-        try{
-            if(mLocationPermissionsGranted){
-
-                final Task location = mFusedLocationProviderClient.getLastLocation();
-                location.addOnCompleteListener(new OnCompleteListener() {
-                    @Override
-                    public void onComplete(@NonNull Task task) {
-                        if(task.isSuccessful()){
-                            Log.d(TAG, "onComplete: found location!");
-                            Location currentLocation = (Location) task.getResult();
-                            LatLng latLng = new LatLng(currentLocation.getLatitude(),currentLocation.getLongitude());
-
-                            //Log.d(TAG, "moveCamera: moving the camera to: lat: " + latLng.latitude + ", lng: " + latLng.longitude );
-                            //mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, DEFAULT_ZOOM));
-
-                            longitude = latLng.longitude;
-                            latitude = latLng.latitude;
-
-
-                            rootRef.child("Coordinates").orderByChild("x").startAt(latitude-0.0005).endAt(latitude+0.0005).addListenerForSingleValueEvent(new ValueEventListener() {
-                                @Override
-                                public void onDataChange(DataSnapshot dataSnapshot) {
-                                    double currentTime = System.currentTimeMillis();
-                                    if (dataSnapshot.exists()) {
-                                        // dataSnapshot is the "issue" node with all children with id 0
-                                        for (DataSnapshot issue : dataSnapshot.getChildren()) {
-                                            //String name = (String) issue.child("y").getValue();
-                                            double ydouble = issue.child("y").getValue(Double.class);
-                                            double xdouble = issue.child("x").getValue(Double.class);
-                                            double zdouble = issue.child("z").getValue(Double.class);
-
-
-                                            if(ydouble > longitude-0.0005 && ydouble < longitude+0.0005) {
-                                                xdouble = ((zdouble * xdouble) + latitude) / (zdouble + 1);
-                                                ydouble = ((zdouble * ydouble) + longitude) / (zdouble + 1);
-                                                zdouble += 1;
-
-                                                DatabaseReference xref = issue.child("x").getRef();
-                                                xref.setValue(xdouble);
-                                                DatabaseReference yref = issue.child("y").getRef();
-                                                yref.setValue(ydouble);
-                                                DatabaseReference zref = issue.child("z").getRef();
-                                                zref.setValue(zdouble);
-                                                DatabaseReference tref = issue.child("time").getRef();
-                                                tref.setValue(currentTime);
-                                                return;
-                                            }
-
-                                        }
-
-
-                                    }
-
-                                    double coorx =latitude ;
-                                    double coory =longitude ;
-                                    HashMap<String, Double> coordinates = new HashMap<String, Double>();
-
-                                    coordinates.put("x", coorx);
-                                    coordinates.put("y", coory);
-                                    coordinates.put("z",1.0);
-                                    coordinates.put("time",currentTime);
-
-
-                                    // usersRef = ref.child("Users").child(name);
-                                    demoRef.push().setValue(coordinates);
-                                    LatLng latLng = new LatLng(latitude,longitude);
-                                    MarkerOptions options = new MarkerOptions()
-                                            .position(latLng)
-                                            .title("Bump!");
-
-                                    options.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE));
-                                    mMap.addMarker(options);
-
-                                }
-
-
-
-                                @Override
-                                public void onCancelled(DatabaseError databaseError) {
-
-                                }
-                            });
-
-                        }else{
-                            Log.d(TAG, "onComplete: current location is null");
-                            Toast.makeText(MapActivity2.this, "unable to get current location", Toast.LENGTH_SHORT).show();
-                        }
-                    }
-                });
-            }
-        }catch (SecurityException e){
-            Log.e(TAG, "getDeviceLocation: SecurityException: " + e.getMessage() );
-        }
-    }
     private void updateSpeed(){
         txt = (TextView) this.findViewById(R.id.textview);
         locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
@@ -406,7 +301,8 @@ public class MapActivity2 extends AppCompatActivity implements OnMapReadyCallbac
             @Override
             public void onLocationChanged(Location location) {
                 float nCurrentSpeed = location.getSpeed();
-                txt.setText((int)(nCurrentSpeed*18)/5 + " km/h");
+                speedInKm =(int) (nCurrentSpeed*18)/5;
+                txt.setText(speedInKm + " km/h");
                 mlatitude=location.getLatitude();
                 mlongitude=location.getLongitude();
                 notifyUser();
@@ -503,26 +399,60 @@ public class MapActivity2 extends AppCompatActivity implements OnMapReadyCallbac
         rootRef.child("Coordinates").orderByChild("x").startAt(mlatitude-0.0005).endAt(mlatitude+0.0005).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
-                double currentTime = System.currentTimeMillis();
+                double xdouble=0;
+                double ydouble=0;
+                double zdouble=0;
                 if (dataSnapshot.exists()) {
-                    // dataSnapshot is the "issue" node with all children with id 0
                     for (DataSnapshot issue : dataSnapshot.getChildren()) {
-                        //String name = (String) issue.child("y").getValue();
-                        double ydouble = issue.child("y").getValue(Double.class);
-                        if(ydouble > mlongitude-0.0005 && ydouble < mlongitude+0.0005) {
-                            Toast.makeText(getApplicationContext(), "5od balak!", Toast.LENGTH_SHORT).show();
+                        xdouble = issue.child("x").getValue(Double.class);
+                        ydouble = issue.child("y").getValue(Double.class);
+                        zdouble = issue.child("z").getValue(Double.class);
+
+                        if (ydouble > mlongitude - 0.0005 && ydouble < mlongitude + 0.0005) {
+                            if (notifyFlag == 1 && zdouble>=10) {
+                                Toast.makeText(getApplicationContext(), "Bump Ahead !", Toast.LENGTH_SHORT).show();
+                                vel1=speedInKm;
+                                buzzer.start();
+                                notifyFlag = 0;
+                            }
+
+
+                        } else {
+                            notifyFlag = 1;
+                        }
+
+                        if ((xdouble > mlatitude - 0.0001 && xdouble < mlatitude + 0.0001) &&
+                                (ydouble > mlongitude - 0.0001 && ydouble < mlongitude+0.0001) &&
+                                zdouble>=10) {
+                            if (velocityFlag==1)
+                            {
+                                vel2=speedInKm;
+                                velocityFlag=0;
+                            }
+
+                        }
+                        else{
+                            velocityFlag=1;
+                            if (vel1>=40 && vel2<=20){//Fast at notify and slow in range
+                                zdouble++;
+                            }
+                            else if (vel2>=40){//Fast in range
+                                zdouble--;
+                            }
+                            DatabaseReference zref = issue.child("z").getRef();
+                            zref.setValue(zdouble);
+
 
                         }
 
                     }
 
-
+                } else {
+                    notifyFlag = 1;
                 }
 
 
-
             }
-
 
 
             @Override

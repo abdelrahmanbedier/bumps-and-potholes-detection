@@ -10,6 +10,7 @@ import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationManager;
+import android.media.MediaPlayer;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
@@ -74,6 +75,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
+
 import java.util.UUID;
 
 /**
@@ -90,11 +92,15 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1234;
     private static final float DEFAULT_ZOOM = 15f;
     private static final LatLngBounds LAT_LNG_BOUNDS = new LatLngBounds(new LatLng(-40,168),new LatLng(71,136));
-
     public double longitude;
     public double latitude;
     public double mlongitude;
     public double mlatitude;
+    public int speedInKm;
+    public int vel1;
+    public int vel2;
+    MediaPlayer buzzer;
+
 
     //widgets
     private AutoCompleteTextView mSearchText;
@@ -121,7 +127,9 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     Thread workerThread;
     byte[] readBuffer;
     int readBufferPosition;
-    int counter;
+    int counter=1;
+    int notifyFlag=1;
+    int velocityFlag=1;
     volatile boolean stopWorker;
     LocationManager locationManager;
     private static final int REQUEST_LOCATION_PERMISSION = 1;
@@ -176,6 +184,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         final ImageView bumpButton = (ImageView) findViewById(R.id.bumpButton);
         final ImageView bumpButtonUsed = (ImageView) findViewById(R.id.bumpButtonUsed);
         final ImageView currentLocationBtn = (ImageView) findViewById(R.id.getLocationButton);
+        buzzer= MediaPlayer.create(this,R.raw.buzzer);
 
         rootRef = FirebaseDatabase.getInstance().getReference();
         demoRef = rootRef.child("Coordinates");
@@ -293,14 +302,11 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         }catch (IOException e){
             Log.e(TAG, "geoLocate: IOException: " + e.getMessage() );
         }
-
         if(list.size() > 0){
             if(mm!=null)
                 mm.remove();
             Address address = list.get(0);
-
             Log.d(TAG, "geoLocate: found a location: " + address.toString());
-            //Toast.makeText(this, address.toString(), Toast.LENGTH_SHORT).show();
             LatLng currentLatLng = new LatLng(mlatitude,mlongitude);
             LatLng addressLatLng = new LatLng(address.getLatitude(),address.getLongitude());
             float distance[] = new float[20];
@@ -315,7 +321,6 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             String url = getRequestUrl(currentLatLng,addressLatLng);
             TaskRequestDirections taskRequestDirections = new TaskRequestDirections();
             taskRequestDirections.execute(url);
-
         }
     }
     private void add2Firebase(){
@@ -335,39 +340,28 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                             Location currentLocation = (Location) task.getResult();
                             LatLng latLng = new LatLng(currentLocation.getLatitude(),currentLocation.getLongitude());
 
-                            //Log.d(TAG, "moveCamera: moving the camera to: lat: " + latLng.latitude + ", lng: " + latLng.longitude );
-                            //mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, DEFAULT_ZOOM));
-
                             longitude = latLng.longitude;
                             latitude = latLng.latitude;
 
-
-                            rootRef.child("Coordinates").orderByChild("x").startAt(latitude-0.0005).endAt(latitude+0.0005).addListenerForSingleValueEvent(new ValueEventListener() {
+                            rootRef.child("Coordinates").orderByChild("x").startAt(latitude-0.0002).endAt(latitude+0.0002).addListenerForSingleValueEvent(new ValueEventListener() {
                                 @Override
                                 public void onDataChange(DataSnapshot dataSnapshot) {
-                                    double currentTime = System.currentTimeMillis();
                                     if (dataSnapshot.exists()) {
-                                        // dataSnapshot is the "issue" node with all children with id 0
                                         for (DataSnapshot issue : dataSnapshot.getChildren()) {
-                                            //String name = (String) issue.child("y").getValue();
                                             double ydouble = issue.child("y").getValue(Double.class);
                                             double xdouble = issue.child("x").getValue(Double.class);
                                             double zdouble = issue.child("z").getValue(Double.class);
-
-
-                                            if(ydouble > longitude-0.0005 && ydouble < longitude+0.0005) {
+                                            if(ydouble > longitude-0.0002 && ydouble < longitude+0.0002) {
                                             xdouble = ((zdouble * xdouble) + latitude) / (zdouble + 1);
                                             ydouble = ((zdouble * ydouble) + longitude) / (zdouble + 1);
                                             zdouble += 1;
-
                                             DatabaseReference xref = issue.child("x").getRef();
                                             xref.setValue(xdouble);
                                             DatabaseReference yref = issue.child("y").getRef();
                                             yref.setValue(ydouble);
                                             DatabaseReference zref = issue.child("z").getRef();
                                             zref.setValue(zdouble);
-                                            DatabaseReference tref = issue.child("time").getRef();
-                                            tref.setValue(currentTime);
+
                                             return;
                                         }
 
@@ -383,10 +377,6 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                                     coordinates.put("x", coorx);
                                     coordinates.put("y", coory);
                                     coordinates.put("z",1.0);
-                                    coordinates.put("time",currentTime);
-
-
-                                    // usersRef = ref.child("Users").child(name);
                                     demoRef.push().setValue(coordinates);
                                     LatLng latLng = new LatLng(latitude,longitude);
                                     MarkerOptions options = new MarkerOptions()
@@ -420,7 +410,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     private void add2FirebaseManually(LatLng latLng){
         longitude = latLng.longitude;
         latitude = latLng.latitude;
-        rootRef.child("Coordinates").orderByChild("x").startAt(latitude-0.0005).endAt(latitude+0.0005).addListenerForSingleValueEvent(new ValueEventListener() {
+        rootRef.child("Coordinates").orderByChild("x").startAt(latitude-0.0002).endAt(latitude+0.0002).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
                 double currentTime = System.currentTimeMillis();
@@ -433,7 +423,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                         double zdouble = issue.child("z").getValue(Double.class);
 
 
-                        if(ydouble > longitude-0.0005 && ydouble < longitude+0.0005) {
+                        if(ydouble > longitude-0.0002 && ydouble < longitude+0.0002) {
                             xdouble = ((zdouble * xdouble) + latitude) / (zdouble + 1);
                             ydouble = ((zdouble * ydouble) + longitude) / (zdouble + 1);
                             zdouble += 1;
@@ -506,7 +496,8 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             @Override
             public void onLocationChanged(Location location) {
                 float nCurrentSpeed = location.getSpeed();
-                txt.setText((int)(nCurrentSpeed*18)/5 + " km/h");
+                speedInKm =(int) (nCurrentSpeed*18)/5;
+                txt.setText(speedInKm + " km/h");
                 mlatitude=location.getLatitude();
                 mlongitude=location.getLongitude();
                 notifyUser();
@@ -603,26 +594,60 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         rootRef.child("Coordinates").orderByChild("x").startAt(mlatitude-0.0005).endAt(mlatitude+0.0005).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
-                double currentTime = System.currentTimeMillis();
+                double xdouble=0;
+                double ydouble=0;
+                double zdouble=0;
                 if (dataSnapshot.exists()) {
-                    // dataSnapshot is the "issue" node with all children with id 0
                     for (DataSnapshot issue : dataSnapshot.getChildren()) {
-                        //String name = (String) issue.child("y").getValue();
-                        double ydouble = issue.child("y").getValue(Double.class);
-                        if(ydouble > mlongitude-0.0005 && ydouble < mlongitude+0.0005) {
-                            Toast.makeText(getApplicationContext(), "5od balak!", Toast.LENGTH_SHORT).show();
+                        xdouble = issue.child("x").getValue(Double.class);
+                        ydouble = issue.child("y").getValue(Double.class);
+                        zdouble = issue.child("z").getValue(Double.class);
+
+                        if (ydouble > mlongitude - 0.0005 && ydouble < mlongitude + 0.0005) {
+                            if (notifyFlag == 1 && zdouble>=10) {
+                                Toast.makeText(getApplicationContext(), "Bump Ahead !", Toast.LENGTH_SHORT).show();
+                                vel1=speedInKm;
+                                buzzer.start();
+                                notifyFlag = 0;
+                            }
+
+
+                        } else {
+                            notifyFlag = 1;
+                        }
+
+                        if ((xdouble > mlatitude - 0.0001 && xdouble < mlatitude + 0.0001) &&
+                                (ydouble > mlongitude - 0.0001 && ydouble < mlongitude+0.0001) &&
+                                zdouble>=10) {
+                            if (velocityFlag==1)
+                            {
+                                vel2=speedInKm;
+                                velocityFlag=0;
+                            }
+
+                        }
+                        else{
+                            velocityFlag=1;
+                            if (vel1>=40 && vel2<=20){//Fast at notify and slow in range
+                                zdouble++;
+                            }
+                            else if (vel2>=40){//Fast in range
+                                zdouble--;
+                            }
+                            DatabaseReference zref = issue.child("z").getRef();
+                            zref.setValue(zdouble);
+
 
                         }
 
                     }
 
-
+                } else {
+                    notifyFlag = 1;
                 }
 
 
-
             }
-
 
 
             @Override
@@ -632,17 +657,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         });
 
 
-            }
-
-
-
-
-
-
-
-
-
-
+    }
 
 
 
@@ -767,7 +782,6 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         readBuffer = new byte[1024];
         workerThread = new Thread(new Runnable() {
             public void run() {
-                Log.d(TAG, "ha b2aa");
 
                 while (!Thread.currentThread().isInterrupted() && !stopWorker) {
                     try {
